@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { ArrowLeft, Download, Expand, BookOpen } from 'lucide-react'
 import { WorldMap } from './WorldMap'
 import { loadCountries } from '../lib/countries'
-import { costFields, destinationCost, totalCost, money } from '../lib/model'
+import { costFields, destinationCost, totalCost, money, visits, stopLabel } from '../lib/model'
 import type { Trip, Student } from '../lib/model'
 export function Passport({ trip, student }: { trip: Trip; student: Student }) {
   return (
@@ -15,9 +15,9 @@ export function Passport({ trip, student }: { trip: Trip; student: Student }) {
           <h2>{student.nickname}의 디지털 여권</h2>
         </div>
       </div>
-      <p className="muted">세계 곳곳에 남긴 나의 발자국 · {trip.destinations.length}개국</p>
+      <p className="muted">세계 곳곳에 남긴 나의 발자국 · {visits(trip).length}개국</p>
       <div className="stamps">
-        {trip.destinations.map((d, i) => (
+        {visits(trip).map((d, i) => (
           <div className={`stamp stamp-${i % 3}`} key={d.id}>
             <span className="stamp-top">WORLD EXPLORER · {String(i + 1).padStart(2, '0')}</span>
             <b>
@@ -29,7 +29,7 @@ export function Passport({ trip, student }: { trip: Trip; student: Student }) {
           </div>
         ))}
       </div>
-      {!trip.destinations.length && <p>여행지를 추가하면 나만의 스탬프가 생겨요.</p>}
+      {!visits(trip).length && <p>여행지를 추가하면 나만의 스탬프가 생겨요.</p>}
     </section>
   )
 }
@@ -121,7 +121,7 @@ export function Portfolio({
             </div>
             <div>
               <span>방문 국가</span>
-              <strong>{trip.destinations.length}개국</strong>
+              <strong>{visits(trip).length}개국</strong>
             </div>
             <div>
               <span>총 여행 비용</span>
@@ -133,63 +133,82 @@ export function Portfolio({
           <section className="portfolio-destination print-page" key={d.id}>
             <div className="chapter">
               <span>CHAPTER {String(i + 1).padStart(2, '0')}</span>
-              <span>{d.visit_date || '날짜 미정'}</span>
+              <span>
+                {d.visit_date || '날짜 미정'} {d.kind !== 'visit' && d.visit_time?.slice(0, 5)}
+              </span>
             </div>
             <h2>
               <Flag code={d.country_code} /> {d.country_name}
-              <small>{d.city}</small>
+              <small>{stopLabel(d)}</small>
             </h2>
-            {d.travel_photos.length > 0 && (
-              <div className="portfolio-photos">
-                {d.travel_photos.map((p) => (
-                  <img src={p.url} key={p.id} alt={`${d.country_name} 여행 사진`} />
-                ))}
+            {d.kind !== 'visit' ? (
+              <div className="story-block">
+                <h3>{stopLabel(d)} 날짜와 시간</h3>
+                <p>
+                  {d.visit_date || '날짜 미정'} {d.visit_time?.slice(0, 5) || '시간 미정'}
+                </p>
+                <h3>공통 준비물</h3>
+                <p>
+                  {trip.packing_items.map((p) => (p.checked ? '☑ ' : '☐ ') + p.text).join(' · ') ||
+                    '등록한 준비물이 없어요.'}
+                </p>
               </div>
-            )}
-            <div className="story-block">
-              <h3>이곳으로 떠나는 이유</h3>
-              <p>{d.reason || '아직 작성하지 않았어요.'}</p>
-            </div>
-            <div className="portfolio-columns">
-              <div>
-                <div className="story-block">
-                  <h3>나의 여행 일정</h3>
-                  <p>{d.schedule || '아직 작성하지 않았어요.'}</p>
-                </div>
-                <div className="story-block">
-                  <h3>해 보고 싶은 활동</h3>
-                  <p>{d.activities || '아직 작성하지 않았어요.'}</p>
-                </div>
-                <div className="story-block">
-                  <h3>가방 속 준비물</h3>
-                  <p>
-                    {d.packing_items.map((p) => (p.checked ? '☑ ' : '☐ ') + p.text).join(' · ') ||
-                      '등록한 준비물이 없어요.'}
-                  </p>
-                </div>
-              </div>
-              <div className="budget-box">
-                <h3>여행 비용</h3>
-                {costFields.map(([key, label]) => (
-                  <div key={key}>
-                    <span>{label}</span>
-                    <span>{money(d[key])}</span>
+            ) : (
+              <>
+                {d.travel_photos.length > 0 && (
+                  <div className="portfolio-photos">
+                    {d.travel_photos.map((p) => (
+                      <img src={p.url} key={p.id} alt={`${d.country_name} 여행 사진`} />
+                    ))}
                   </div>
-                ))}
-                <div className="budget-total">
-                  <b>합계</b>
-                  <b>{money(destinationCost(d))}</b>
+                )}
+                <div className="story-block">
+                  <h3>이곳으로 떠나는 이유</h3>
+                  <p>{d.reason || '아직 작성하지 않았어요.'}</p>
                 </div>
-              </div>
-            </div>
-            <div className="story-block diary-block">
-              <h3>나의 여행 일기</h3>
-              <p>{d.diary || '아직 작성하지 않았어요.'}</p>
-            </div>
-            <div className="story-block">
-              <h3>여행을 통해 알게 된 점</h3>
-              <p>{d.learned || '아직 작성하지 않았어요.'}</p>
-            </div>
+                <div className="portfolio-columns">
+                  <div>
+                    <div className="story-block">
+                      <h3>나의 여행 일정</h3>
+                      <p>{d.schedule || '아직 작성하지 않았어요.'}</p>
+                    </div>
+                    <div className="story-block">
+                      <h3>해 보고 싶은 활동</h3>
+                      <p>{d.activities || '아직 작성하지 않았어요.'}</p>
+                    </div>
+                    <div className="story-block">
+                      <h3>가방 속 준비물</h3>
+                      <p>
+                        {trip.packing_items
+                          .map((p) => (p.checked ? '☑ ' : '☐ ') + p.text)
+                          .join(' · ') || '등록한 준비물이 없어요.'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="budget-box">
+                    <h3>여행 비용</h3>
+                    {costFields.map(([key, label]) => (
+                      <div key={key}>
+                        <span>{label}</span>
+                        <span>{money(d[key])}</span>
+                      </div>
+                    ))}
+                    <div className="budget-total">
+                      <b>합계</b>
+                      <b>{money(destinationCost(d))}</b>
+                    </div>
+                  </div>
+                </div>
+                <div className="story-block diary-block">
+                  <h3>나의 여행 일기</h3>
+                  <p>{d.diary || '아직 작성하지 않았어요.'}</p>
+                </div>
+                <div className="story-block">
+                  <h3>여행을 통해 알게 된 점</h3>
+                  <p>{d.learned || '아직 작성하지 않았어요.'}</p>
+                </div>
+              </>
+            )}
             <footer>지구 한 바퀴 — {student.nickname}의 여행 기록</footer>
           </section>
         ))}

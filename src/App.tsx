@@ -23,7 +23,15 @@ import { DestinationEditor } from './components/DestinationEditor'
 import { Passport, Portfolio } from './components/Portfolio'
 import { db } from './lib/supabase'
 import * as api from './lib/api'
-import { newDestination, totalCost, money, submissionIssues } from './lib/model'
+import {
+  newDestination,
+  newHome,
+  visits,
+  stopLabel,
+  totalCost,
+  money,
+  submissionIssues,
+} from './lib/model'
 import type { Trip, Student, Project, Destination } from './lib/model'
 import { compressImage } from './lib/images'
 import './App.css'
@@ -34,7 +42,8 @@ function demoTrip(): Trip {
     student_id: 'demo',
     title: '세상을 만나는 나의 첫 여행',
     submitted: false,
-    destinations: [],
+    destinations: [newHome('departure', 0)],
+    packing_items: [],
   }
 }
 function Brand() {
@@ -136,21 +145,42 @@ export default function App() {
   }
   function selectCountry(c: Country) {
     if (!trip) return
+    if (trip.submitted || busy) return
+    if (c.code === 'KR') {
+      addArrival()
+      return
+    }
     const existing = trip.destinations.find((d) => d.country_code === c.code)
     if (existing) {
       setSelected(existing.id)
       return
     }
-    if (trip.submitted || busy) return
-    if (trip.destinations.length >= 50) {
-      setError('여행지는 최대 50개까지 추가할 수 있어요.')
+    if (visits(trip).length >= 48) {
+      setError('해외 여행지는 최대 48개입니다.')
       return
     }
     const d = newDestination(c.code, c.name, trip.destinations.length)
+    const arrival = trip.destinations.find((x) => x.kind === 'arrival')
+    const list = [
+      ...trip.destinations.filter((x) => x.kind !== 'arrival'),
+      d,
+      ...(arrival ? [arrival] : []),
+    ]
+    change({ ...trip, destinations: list.map((x, i) => ({ ...x, visit_order: i })) })
+    setSelected(d.id)
+  }
+  function addArrival() {
+    if (!trip || trip.submitted || busy) return
+    const existing = trip.destinations.find((d) => d.kind === 'arrival')
+    if (existing) {
+      setSelected(existing.id)
+      return
+    }
+    const d = newHome('arrival', trip.destinations.length)
     change({ ...trip, destinations: [...trip.destinations, d] })
     setSelected(d.id)
   }
-  const current = trip?.destinations.find((d) => d.id === selected)
+  const current = trip?.destinations.find((d) => d.id === selected) ?? trip?.destinations[0]
   async function upload(file: File) {
     await run(async () => {
       if (!trip || !student || !current) return
@@ -190,6 +220,7 @@ export default function App() {
     })
   }
   async function removeDestination(d: Destination) {
+    if (d.kind === 'departure') return
     if (!window.confirm(`${d.country_name}의 기록과 사진을 삭제할까요?`)) return
     await run(async () => {
       if (!trip) return
@@ -210,6 +241,11 @@ export default function App() {
   }
   function move(index: number, delta: number) {
     if (!trip) return
+    if (
+      trip.destinations[index]?.kind !== 'visit' ||
+      trip.destinations[index + delta]?.kind !== 'visit'
+    )
+      return
     const list = [...trip.destinations]
     ;[list[index], list[index + delta]] = [list[index + delta], list[index]]
     change({ ...trip, destinations: list.map((d, i) => ({ ...d, visit_order: i })) })
@@ -340,14 +376,16 @@ export default function App() {
           <div className="sidebar-footer">
             <span>나의 여행 스탬프</span>
             <strong>
-              {String(trip.destinations.length).padStart(2, '0')} <small>개국</small>
+              {String(visits(trip).length).padStart(2, '0')} <small>개국</small>
             </strong>
             <div className="mini-stamps">
-              {trip.destinations.slice(0, 5).map((d) => (
-                <span key={d.id}>
-                  <Flag code={d.country_code} />
-                </span>
-              ))}
+              {visits(trip)
+                .slice(0, 5)
+                .map((d) => (
+                  <span key={d.id}>
+                    <Flag code={d.country_code} />
+                  </span>
+                ))}
             </div>
           </div>
         </aside>
@@ -361,7 +399,9 @@ export default function App() {
           <div className="workspace-heading">
             <div>
               <p className="eyebrow">YOUR NEXT CHAPTER</p>
-              <h1>{view === 'passport' ? '나만의 디지털 여권' : '나의 세계여행'}</h1>
+              <h1>
+                {view === 'passport' ? '나만의 디지털 여권' : `${student.nickname}의 세계여행`}
+              </h1>
               <p className="muted">지도 위에 목적지를 더하고, 나만의 이야기를 채워 보세요.</p>
             </div>
             <div className="workspace-actions">
@@ -431,7 +471,7 @@ export default function App() {
                     <h2>
                       <Globe2 size={19} /> 나의 여행 지도
                     </h2>
-                    <span>{trip.destinations.length}개국의 새로운 발견</span>
+                    <span>{visits(trip).length}개국의 새로운 발견</span>
                   </div>
                   <WorldMap
                     destinations={trip.destinations}
@@ -458,7 +498,7 @@ export default function App() {
                     ) : (
                       trip.destinations.map((d, i) => (
                         <div
-                          className={`route-item ${selected === d.id ? 'active' : ''}`}
+                          className={`route-item ${current?.id === d.id ? 'active' : ''}`}
                           key={d.id}
                         >
                           <button className="route-select" onClick={() => setSelected(d.id)}>
@@ -468,28 +508,36 @@ export default function App() {
                             </span>
                             <span>
                               <strong>{d.country_name}</strong>
-                              <small>{d.city || '도시를 정해 주세요'}</small>
+                              <small>{stopLabel(d)}</small>
                             </span>
                           </button>
                           {!trip.submitted && (
                             <div className="route-buttons">
                               <button
-                                disabled={busy || i === 0}
+                                disabled={
+                                  busy ||
+                                  d.kind !== 'visit' ||
+                                  trip.destinations[i - 1]?.kind !== 'visit'
+                                }
                                 aria-label={`${d.country_name} 순서 앞으로`}
                                 onClick={() => move(i, -1)}
                               >
                                 <ArrowUp size={14} />
                               </button>
                               <button
-                                disabled={busy || i === trip.destinations.length - 1}
+                                disabled={
+                                  busy ||
+                                  d.kind !== 'visit' ||
+                                  trip.destinations[i + 1]?.kind !== 'visit'
+                                }
                                 aria-label={`${d.country_name} 순서 뒤로`}
                                 onClick={() => move(i, 1)}
                               >
                                 <ArrowDown size={14} />
                               </button>
                               <button
-                                disabled={busy}
-                                aria-label={`${d.country_name} 여행지 삭제`}
+                                disabled={busy || d.kind === 'departure'}
+                                aria-label={`${d.country_name} ${stopLabel(d)} 여행지 삭제`}
                                 onClick={() => void removeDestination(d)}
                               >
                                 <Trash2 size={14} />
@@ -500,6 +548,11 @@ export default function App() {
                       ))
                     )}
                   </div>
+                  {!trip.submitted && !trip.destinations.some((d) => d.kind === 'arrival') && (
+                    <button className="outline return-home" disabled={busy} onClick={addArrival}>
+                      <Plane size={16} /> 대한민국 도착 추가
+                    </button>
+                  )}
                   <div className="route-summary">
                     <span>전체 예상 여행 비용</span>
                     <strong>{money(totalCost(trip))}</strong>
@@ -511,6 +564,8 @@ export default function App() {
                 <DestinationEditor
                   key={current.id}
                   destination={current}
+                  packingItems={trip.packing_items}
+                  onPackingChange={(items) => change({ ...trip, packing_items: items })}
                   disabled={trip.submitted}
                   busy={busy}
                   onChange={(d) =>
@@ -733,8 +788,9 @@ function Entry({
                     required
                     value={code}
                     maxLength={8}
-                    minLength={8}
-                    placeholder="선생님이 알려 준 8자리 코드"
+                    minLength={4}
+                    pattern="(?:[0-9]{4}|[A-Za-z0-9]{8})"
+                    placeholder="4자리 숫자 코드 (기존 8자리도 가능)"
                     onChange={(e) => setCode(e.target.value.toUpperCase())}
                   />
                 </label>

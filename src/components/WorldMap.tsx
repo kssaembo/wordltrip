@@ -76,7 +76,13 @@ export function WorldMap({
                 }}
               >
                 {c.name}
-                <span>{visited.has(c.code) ? '선택됨' : '+ 추가'}</span>
+                <span>
+                  {c.code === 'KR' && !destinations.some((d) => d.kind === 'arrival')
+                    ? '+ 도착 추가'
+                    : visited.has(c.code)
+                      ? '선택됨'
+                      : '+ 추가'}
+                </span>
               </button>
             ))}
           {!countries.some((c) =>
@@ -141,7 +147,9 @@ export function WorldMap({
             })}
             {points.map(
               (p, i) =>
-                p && (
+                p &&
+                destinations.findIndex((d) => d.country_code === destinations[i].country_code) ===
+                  i && (
                   <g
                     key={destinations[i].id}
                     onClick={() => {
@@ -153,7 +161,12 @@ export function WorldMap({
                     <circle
                       cx={p[0]}
                       cy={p[1]}
-                      r="13"
+                      r={
+                        destinations.filter((d) => d.country_code === destinations[i].country_code)
+                          .length > 1
+                          ? 17
+                          : 13
+                      }
                       fill="#fff"
                       stroke="#187c79"
                       strokeWidth="2"
@@ -166,7 +179,12 @@ export function WorldMap({
                       fontWeight="800"
                       fill="#175c5b"
                     >
-                      {i + 1}
+                      {destinations
+                        .map((d, j) =>
+                          d.country_code === destinations[i].country_code ? j + 1 : null,
+                        )
+                        .filter(Boolean)
+                        .join('·')}
                     </text>
                   </g>
                 ),

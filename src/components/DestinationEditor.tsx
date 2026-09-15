@@ -1,25 +1,30 @@
 import { Flag } from './Flag'
 import { useState } from 'react'
-import { Plus, Trash2, ImagePlus, MapPin, Check } from 'lucide-react'
+import { Trash2, ImagePlus, MapPin } from 'lucide-react'
 import { costFields, destinationCost, money } from '../lib/model'
-import type { Destination } from '../lib/model'
+import { PackingList } from './PackingList'
+import type { Destination, PackingItem } from '../lib/model'
 export function DestinationEditor({
   destination: d,
   onChange,
+  packingItems,
+  onPackingChange,
   onUpload,
   onDeletePhoto,
   disabled,
   busy,
 }: {
   destination: Destination
+  packingItems: PackingItem[]
+  onPackingChange: (items: PackingItem[]) => void
   onChange: (d: Destination) => void
   onUpload: (f: File) => Promise<void>
   onDeletePhoto: (id: string) => void
   disabled: boolean
   busy: boolean
 }) {
-  const [tab, setTab] = useState('plan')
-  const [packing, setPacking] = useState('')
+  const home = d.kind !== 'visit'
+  const [tab, setTab] = useState(home ? 'packing' : 'plan')
   const patch = (changes: Partial<Destination>) => onChange({ ...d, ...changes })
   return (
     <section className="editor panel">
@@ -34,20 +39,50 @@ export function DestinationEditor({
           </h2>
         </div>
         <span className="tag">
-          <MapPin size={14} /> {d.city || '도시를 정해 주세요'}
+          <MapPin size={14} />{' '}
+          {home
+            ? d.kind === 'departure'
+              ? '대한민국 출발'
+              : '대한민국 도착'
+            : d.city || '도시를 정해 주세요'}
         </span>
       </div>
+      {home && (
+        <fieldset className="editor-fields home-time" disabled={disabled || busy}>
+          <label>
+            {d.kind === 'departure' ? '출발' : '도착'} 날짜와 시간
+            <input
+              type="datetime-local"
+              value={
+                d.visit_date && d.visit_time ? d.visit_date + 'T' + d.visit_time.slice(0, 5) : ''
+              }
+              onChange={(e) => {
+                const [date = '', time = ''] = e.target.value.split('T')
+                patch({ visit_date: date, visit_time: time })
+              }}
+              onBlur={(e) => {
+                const [date = '', time = ''] = e.currentTarget.value.split('T')
+                patch({ visit_date: date, visit_time: time })
+              }}
+            />
+          </label>
+        </fieldset>
+      )}
       <div className="tabs" role="tablist">
-        {[
-          ['plan', '여행 계획'],
-          ['packing', '준비물'],
-          ['photos', '사진'],
-          ['cost', '여행 비용'],
-          ['diary', '여행 일기'],
-        ].map(([id, label]) => (
+        {(home
+          ? [['packing', '준비물']]
+          : [
+              ['plan', '여행 계획'],
+              ['packing', '준비물'],
+              ['photos', '사진'],
+              ['cost', '여행 비용'],
+              ['diary', '여행 일기'],
+            ]
+        ).map(([id, label]) => (
           <button
             key={id}
             role="tab"
+            disabled={id === 'packing' && !home}
             aria-selected={tab === id}
             onClick={() => setTab(id)}
             className={tab === id ? 'active' : ''}
@@ -109,80 +144,8 @@ export function DestinationEditor({
             </label>
           </>
         )}
-        {tab === 'packing' && (
-          <>
-            <p className="muted">이 여행지에 필요한 준비물을 직접 골라 보세요.</p>
-            <div className="packing-add">
-              <input
-                aria-label="새 준비물"
-                value={packing}
-                maxLength={100}
-                placeholder="예: 여권, 운동화, 충전기"
-                onChange={(e) => setPacking(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    if (packing.trim()) {
-                      patch({
-                        packing_items: [
-                          ...d.packing_items,
-                          { id: crypto.randomUUID(), text: packing.trim(), checked: false },
-                        ],
-                      })
-                      setPacking('')
-                    }
-                  }
-                }}
-              />
-              <button
-                className="primary"
-                disabled={!packing.trim()}
-                onClick={() => {
-                  patch({
-                    packing_items: [
-                      ...d.packing_items,
-                      { id: crypto.randomUUID(), text: packing.trim(), checked: false },
-                    ],
-                  })
-                  setPacking('')
-                }}
-              >
-                <Plus size={17} /> 추가
-              </button>
-            </div>
-            <div className="packing-list">
-              {d.packing_items.map((item) => (
-                <div key={item.id}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={item.checked}
-                      onChange={(e) =>
-                        patch({
-                          packing_items: d.packing_items.map((x) =>
-                            x.id === item.id ? { ...x, checked: e.target.checked } : x,
-                          ),
-                        })
-                      }
-                    />
-                    <span className={item.checked ? 'checked' : ''}>{item.text}</span>
-                  </label>
-                  <button
-                    aria-label={`${item.text} 삭제`}
-                    onClick={() =>
-                      patch({ packing_items: d.packing_items.filter((x) => x.id !== item.id) })
-                    }
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <p className="muted">
-              <Check size={15} /> {d.packing_items.filter((p) => p.checked).length} /{' '}
-              {d.packing_items.length}개 준비 완료
-            </p>
-          </>
+        {tab === 'packing' && home && (
+          <PackingList items={packingItems} onChange={onPackingChange} />
         )}
         {tab === 'photos' && (
           <>
@@ -278,6 +241,11 @@ export function DestinationEditor({
           </>
         )}
       </fieldset>
+      {!home && (
+        <div className="editor-fields">
+          <PackingList items={packingItems} readOnly />
+        </div>
+      )}
     </section>
   )
 }

@@ -28,7 +28,7 @@ export async function myStudent() {
 export async function loadTrip(studentId: string): Promise<Trip> {
   const { data, error } = await db()
     .from('trips')
-    .select('*, destinations(*, packing_items(*), travel_photos(*))')
+    .select('*, packing_items(*), destinations(*, travel_photos(*))')
     .eq('student_id', studentId)
     .single()
   if (error) throw error
@@ -51,6 +51,7 @@ export async function saveTrip(trip: Trip) {
   const { error } = await db().rpc('save_trip', {
     p_trip: trip.id,
     p_title: trip.title,
+    p_packing: trip.packing_items,
     p_destinations: trip.destinations.map(({ travel_photos: _photos, ...d }) => d),
   })
   if (error) throw error
