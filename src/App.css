@@ -2017,3 +2017,82 @@ fieldset {
     padding-bottom: 80px;
   }
 }
+.exchange-calculator {
+  border: 1px solid #dbe7e2;
+  border-radius: 10px;
+  background: #f4f8f6;
+  margin: 0 0 16px;
+}
+.exchange-calculator summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+.exchange-calculator summary::after {
+  content: '＋';
+  margin-left: auto;
+}
+.exchange-calculator[open] summary::after {
+  content: '−';
+}
+.exchange-calculator summary small {
+  font-weight: 400;
+  color: #637f7a;
+  font-size: 11px;
+}
+.exchange-body {
+  padding: 0 14px 14px;
+}
+.exchange-body select {
+  width: 100%;
+  padding: 10px;
+  background: white;
+  border: 1px solid #d7e4df;
+  border-radius: 8px;
+  font: inherit;
+  color: inherit;
+}
+.exchange-body .field-row {
+  margin-bottom: 8px;
+}
+.exchange-formula,
+.exchange-disclaimer,
+.exchange-warning,
+.exchange-body [role='status'] {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.exchange-formula {
+  color: #5e7973;
+  margin: 6px 0;
+}
+.exchange-body output {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  color: #176b63;
+  margin: 8px 0 14px;
+}
+.exchange-apply {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.exchange-apply label {
+  flex: 1;
+  min-width: 120px;
+}
+.exchange-disclaimer {
+  border-top: 1px solid #dbe7e2;
+  padding-top: 10px;
+  margin: 12px 0 0;
+  color: #687f78;
+}
+.exchange-warning {
+  color: #996011;
+}

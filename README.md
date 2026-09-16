@@ -163,3 +163,24 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 - 자동 가격 조회나 Google Maps API 삽입은 하지 않습니다. 조사 결과는 학생이 직접 기록합니다.
 
 참고: [PWA 시작 화면](https://web.dev/learn/pwa/enhancements), [설치 버튼](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/How_to/Trigger_install_prompt), [Google Maps 링크](https://developers.google.com/maps/documentation/urls/get-started).
+
+## 간편 환산기 (학습용 고정 환율)
+
+여행 비용 탭에 접을 수 있는 환산기를 제공합니다. 실시간 환율 API는 사용하지 않습니다. 일본·중국 등 지원 국가의 화폐를 기본 선택하고, 미지원 국가는 직접 선택하도록 합니다. 외화는 소수 둘째 자리까지 입력할 수 있고 결과는 정수 원으로 반올림합니다. ‘선택한 비용에 더하기’를 눌러야 기존 비용에 가산되며, 입력값을 비워 중복 클릭을 방지합니다. 저장은 기존 여행 저장 버튼을 사용합니다. 항목당 10억 원 한도를 적용합니다.
+
+아래 수치는 실제 시세가 아닌 계산 편의를 위해 정한 **학습용 배율**입니다. 계산기 하단에도 안내를 표시합니다.
+
+| 화폐            | 1단위당 학습용 원화 |
+| --------------- | ------------------: |
+| 일본 엔 JPY     |                10원 |
+| 중국 위안 CNY   |               200원 |
+| 미국 달러 USD   |             1,400원 |
+| 유로 EUR        |             1,500원 |
+| 영국 파운드 GBP |             1,800원 |
+| 호주 달러 AUD   |               900원 |
+| 캐나다 달러 CAD |             1,000원 |
+| 스위스 프랑 CHF |             1,600원 |
+| 홍콩 달러 HKD   |               180원 |
+| 태국 바트 THB   |                40원 |
+
+별도 SQL이나 환경 변수 변경은 필요하지 않습니다.

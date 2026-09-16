@@ -1,3 +1,4 @@
+import { ExchangeCalculator } from './ExchangeCalculator'
 import { Flag } from './Flag'
 import { useState } from 'react'
 import { Trash2, ImagePlus, MapPin } from 'lucide-react'
@@ -185,6 +186,7 @@ export function DestinationEditor({
         {tab === 'cost' && (
           <>
             <p className="muted">직접 조사한 비용을 원화(원)로 입력해 주세요.</p>
+            <ExchangeCalculator key={d.id} destination={d} onChange={onChange} />
             <div className="cost-fields">
               {costFields.map(([key, label]) => (
                 <label key={key}>
