@@ -148,3 +148,18 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 - 포트폴리오에 표지, 기록, 디지털 여권·날짜 표시 확인.
 - 1024×768 태블릿 가로모드에서 가로 넘침 없음.
 - PDF 버튼 호출 시 JS 오류 없음. 내장 미리보기는 운영체제 인쇄 창을 검수할 수 없어 **실제 A4 PDF 파일 출력은 Chrome/Edge에서 최종 확인 필요**.
+
+## PWA 설치와 조사 도구 (2026-09-16)
+
+이번 PWA 변경에는 추가 SQL이 필요하지 않습니다. 이전 왕복 여행 업데이트인 002 SQL은 적용되어 있어야 합니다.
+
+- `npm run build`가 서비스 워커까지 생성합니다. Vercel에는 기존처럼 배포하면 됩니다. HTTPS 또는 localhost에서 설치 준비 기능이 동작합니다. `npm run dev`는 서비스 워커를 등록하지 않으며, `npm run build` 후 `npm run preview`로 검증합니다.
+- Chrome/Edge는 설치 조건이 갖춰지면 ‘앱 설치’ 버튼을 표시합니다. 그 외에는 설치 안내를 표시합니다. iPhone/iPad는 Safari 공유 메뉴의 ‘홈 화면에 추가’를 사용합니다. 학교 기기 정책에 따라 설치가 제한될 수 있습니다.
+- 독립 창으로 실행되지만 기록 조회·저장·사진 업로드는 온라인 전용입니다. 오프라인 시작 시 연결 안내를 표시합니다. 서비스 워커는 공개 오프라인 화면과 아이콘만 저장하고 학생 기록, 인증 응답, 사진을 캐시하지 않습니다. 업데이트 중 강제 새로고침을 하지 않습니다.
+- 생성한 지구·종이비행기 그림을 아이콘, maskable 아이콘, 웹 시작 화면에 사용합니다. Android 시작 화면은 OS가 manifest 정보로 구성합니다. iOS 시작 이미지는 390×844, 430×932, 820×1180, 1024×1366 논리 해상도의 세로·가로 화면을 제공합니다. 다른 화면 크기는 웹 시작 화면으로 이어지며 모든 기기의 OS 시작 화면이 동일하지는 않습니다.
+- `scripts/generate-startup.ps1`은 PowerShell 7에서 시작 이미지 8개를 재생성합니다. 일반 배포에는 실행할 필요가 없습니다.
+- 학생 화면의 네이버 항공권·네이버 호텔·Google Maps 버튼은 새 창(`target=_blank`, `noopener noreferrer`)으로 엽니다. 학생 이름/학급 코드/기록을 URL에 보내지 않습니다. 원래 탭이나 앱 전환 화면으로 돌아옵니다. Chrome을 강제하지 않으며 OS 설정에 따라 지도 앱이나 외부 브라우저가 열릴 수 있습니다.
+- 검색 전에 저장하도록 안내합니다. 앱 전환 중 운영체제가 앱을 종료하면 저장하지 않은 내용은 복구되지 않습니다. 특히 iOS에서 브라우저와 설치 앱의 로그인 저장소가 다를 수 있으므로 학생은 설치 후 참가하고, 작성 중 사용 환경을 바꾸지 않는 것이 좋습니다.
+- 자동 가격 조회나 Google Maps API 삽입은 하지 않습니다. 조사 결과는 학생이 직접 기록합니다.
+
+참고: [PWA 시작 화면](https://web.dev/learn/pwa/enhancements), [설치 버튼](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/How_to/Trigger_install_prompt), [Google Maps 링크](https://developers.google.com/maps/documentation/urls/get-started).

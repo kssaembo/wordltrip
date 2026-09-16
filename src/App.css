@@ -1890,3 +1890,130 @@ fieldset {
 .route-select small {
   white-space: normal;
 }
+.research-tools {
+  padding: 18px 20px;
+  margin: 18px 0;
+  background: #fff;
+  border: 1px solid #dce8e5;
+  border-radius: 16px;
+}
+.research-tools > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.research-tools > div > span,
+.research-tools p {
+  font-size: 12px;
+  color: #637f7a;
+}
+.research-links {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.research-links a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: #f1f7f5;
+  border: 1px solid #e1eeea;
+  border-radius: 12px;
+  text-decoration: none;
+  color: #176b63;
+  font-size: 14px;
+  font-weight: 700;
+}
+.research-links a:hover {
+  background: #e0efea;
+}
+.research-links a:focus-visible {
+  outline: 3px solid #d69740;
+  outline-offset: 3px;
+}
+.research-links a > svg:last-child {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.research-links small {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  margin-top: 3px;
+  color: #607d77;
+}
+.research-tools p {
+  line-height: 1.7;
+  margin: 12px 0 0;
+}
+.app-splash {
+  background: #f5f3ed;
+  gap: 12px;
+}
+.app-splash > img {
+  object-fit: contain;
+  border-radius: 24px;
+}
+.pwa-controls {
+  position: fixed;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  right: 18px;
+  z-index: 45;
+  max-width: calc(100vw - 36px);
+}
+.install-button {
+  background: #fff;
+  box-shadow: 0 3px 18px #163b3820;
+  border: 1px solid #d4e2de;
+  font-size: 12px;
+  float: right;
+}
+.install-help {
+  clear: both;
+  max-width: 330px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #d4e2de;
+  border-radius: 14px;
+  box-shadow: 0 8px 40px #163b3830;
+}
+.install-help p,
+.install-help small {
+  font-size: 12px;
+  line-height: 1.8;
+}
+.help-close {
+  float: right;
+  padding: 2px;
+  margin-left: 10px;
+}
+.connection-banner {
+  max-width: 390px;
+  background: #fff0d2;
+  color: #654919;
+  padding: 14px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+@media (max-width: 600px) {
+  .research-links {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .research-links a {
+    padding: 10px 12px;
+  }
+  .research-tools {
+    padding: 14px;
+  }
+  .pwa-controls {
+    right: 10px;
+    bottom: 10px;
+  }
+  .workspace {
+    padding-bottom: 80px;
+  }
+}

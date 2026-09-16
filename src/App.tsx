@@ -1,3 +1,4 @@
+import { ResearchLinks } from './components/ResearchLinks'
 import { Flag } from './components/Flag'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -270,7 +271,8 @@ export default function App() {
   if (portfolio) return <Portfolio {...portfolio} onClose={() => setPortfolio(null)} />
   if (initializing)
     return (
-      <div className="loading">
+      <div className="loading app-splash" role="status">
+        <img src="/pwa/icon-512.png" alt="" width="180" height="180" />
         <Brand />
         <p>여행 기록을 불러오는 중…</p>
       </div>
@@ -450,6 +452,7 @@ export default function App() {
               기록과 PDF를 확인할 수 있어요.
             </div>
           )}
+          <ResearchLinks dirty={dirty} demo={demo} />
           {view === 'passport' ? (
             <Passport trip={trip} student={student} />
           ) : (
