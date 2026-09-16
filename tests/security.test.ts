@@ -44,6 +44,12 @@ beforeAll(async () => {
       'utf8',
     ),
   )
+  await sql.exec(
+    readFileSync(
+      new URL('../supabase/migrations/202609160003_rejoin_reopen.sql', import.meta.url),
+      'utf8',
+    ),
+  )
   await asUser(teacher, false)
   project = (
     await one<{ p: { id: string; class_code: string } }>(
@@ -256,6 +262,48 @@ describe('실제 PostgreSQL RLS 및 서버 쓰기 권한', () => {
     await expect(
       sql.query('select join_class($1,$2)', [project.class_code, '공격']),
     ).rejects.toThrow()
+  })
+  it('다른 기기에서 학급 코드와 같은 닉네임으로 기존 여행과 사진을 연다', async () => {
+    await asUser(outsider)
+    await expect(sql.query('select join_class($1,$2)', ['wrong', '여행자A'])).rejects.toThrow()
+    const result = await one<{ id: string }>('select id from join_class($1,$2)', [
+      project.class_code,
+      ' 여행자A ',
+    ])
+    expect(result.id).toBe(a.id)
+    expect((await one<{ id: string }>('select id from trips')).id).toBe(at)
+    expect((await sql.query('select * from travel_photos')).rows).toHaveLength(3)
+    await expect(sql.query('update student_sessions set student_id=$1', [b.id])).rejects.toThrow()
+    await expect(sql.query('select reopen_trip($1)', [at])).rejects.toThrow('담당 교사')
+    await asUser(alice)
+    expect((await one<{ id: string }>('select id from trips')).id).toBe(at)
+  })
+  it('담당 교사만 제출 취소 가능하고 새 기기에서도 수정 권한이 복구된다', async () => {
+    await asUser(outsider, false)
+    await expect(sql.query('select reopen_trip($1)', [at])).rejects.toThrow('담당 교사')
+    await asUser(teacher, false)
+    await sql.query('select reopen_trip($1)', [at])
+    expect(
+      (await one<{ submitted: boolean }>('select submitted from trips where id=$1', [at]))
+        .submitted,
+    ).toBe(false)
+    await asUser(outsider)
+    await sql.query('select save_trip($1,$2,$3,$4)', [at, '다시 작성', JSON.stringify(route), '[]'])
+    expect((await one<{ title: string }>('select title from trips')).title).toBe('다시 작성')
+    const path = project.id + '/' + a.id + '/' + did + '/image.webp'
+    expect(
+      (await one<{ ok: boolean }>('select photo_path_allowed($1,true) as ok', [path])).ok,
+    ).toBe(true)
+    await sql.query('select submit_trip($1)', [at])
+  })
+  it('세션 전환 후 이전 학생과 다른 학급 기록에 접근하지 못한다', async () => {
+    await asUser(outsider)
+    await sql.query('select join_class($1,$2)', [project.class_code, '새 여행자'])
+    expect((await sql.query('select * from trips where id=$1', [at])).rows).toHaveLength(0)
+    await expect(
+      sql.query('select save_trip($1,$2,$3,$4)', [at, '변경', JSON.stringify(route), '[]']),
+    ).rejects.toThrow()
+    expect((await sql.query('select * from students')).rows).toHaveLength(1)
   })
 })
 it('금액은 숫자로 정확하게 합산하고 미완성 제출을 검출한다', () => {

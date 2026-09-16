@@ -625,7 +625,7 @@ export default function App() {
           text={
             demo
               ? '작성한 체험 내용이 사라집니다.'
-              : `${dirty ? '저장하지 않은 변경 사항은 사라집니다. ' : ''}학생 익명 계정은 로그아웃 후 닉네임만으로 복구할 수 없습니다. 같은 브라우저에서 계속 작성하려면 취소해 주세요.`
+              : `${dirty ? '저장하지 않은 변경 사항은 사라집니다. ' : ''}같은 학급 코드와 닉네임을 입력하면 다른 기기에서도 다시 접속할 수 있어요.`
           }
           onCancel={() => setConfirm(null)}
           onConfirm={() => void leave()}
@@ -808,8 +808,8 @@ function Entry({
                   />
                 </label>
                 <p className="fineprint">
-                  이 브라우저에서 이어서 작성할 수 있어요. 공용 기기에서는 내 기록이 남아 있는지
-                  확인해 주세요.
+                  같은 학급 코드와 닉네임으로 기존 기록을 이어서 열어요. 다른 사람의 닉네임은
+                  사용하지 마세요.
                 </p>
               </>
             ) : (
@@ -895,6 +895,8 @@ function TeacherDashboard({
   const [projects, setProjects] = useState<Project[]>([])
   const [project, setProject] = useState('')
   const [title, setTitle] = useState('')
+  const [reopen, setReopen] = useState<{ id: string; nickname: string } | null>(null)
+  const [reopenNotice, setReopenNotice] = useState('')
   const [students, setStudents] = useState<Awaited<ReturnType<typeof api.roster>>>([])
   useEffect(() => {
     void run(async () => {
@@ -999,6 +1001,7 @@ function TeacherDashboard({
                   <th>학생 닉네임</th>
                   <th>제출 상태</th>
                   <th>포트폴리오</th>
+                  <th>제출 관리</th>
                 </tr>
               </thead>
               <tbody>
@@ -1028,6 +1031,14 @@ function TeacherDashboard({
                         전체화면 열람 <ArrowRight size={15} />
                       </button>
                     </td>
+                    <td>
+                      <button
+                        disabled={busy || !s.trips[0]?.submitted}
+                        onClick={() => setReopen({ id: s.trips[0].id, nickname: s.nickname })}
+                      >
+                        제출 취소
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1040,6 +1051,27 @@ function TeacherDashboard({
           </section>
         )}
       </main>
+      {reopenNotice && (
+        <p className="notice" role="status">
+          {reopenNotice}
+        </p>
+      )}
+      {reopen && (
+        <Confirm
+          title={reopen.nickname + '의 제출을 취소할까요?'}
+          text="기록은 유지되며 학생이 다시 수정하고 제출할 수 있습니다. 학생은 화면을 새로고침해 주세요."
+          busy={busy}
+          onCancel={() => setReopen(null)}
+          onConfirm={() =>
+            void run(async () => {
+              await api.reopenTrip(reopen.id)
+              setReopen(null)
+              setReopenNotice('제출을 취소했습니다. 학생이 새로고침하면 다시 작성할 수 있어요.')
+              setStudents(await api.roster(project))
+            })
+          }
+        />
+      )}
       {exitDialog}
     </div>
   )

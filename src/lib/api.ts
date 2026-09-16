@@ -17,13 +17,24 @@ export async function joinClass(code: string, nickname: string) {
   return (Array.isArray(data) ? data[0] : data) as Student
 }
 export async function myStudent() {
-  const { data, error } = await db()
-    .from('students')
-    .select('*')
+  const { data: session, error: sessionError } = await db()
+    .from('student_sessions')
+    .select('student_id')
     .eq('user_id', (await db().auth.getUser()).data.user?.id ?? '')
     .maybeSingle()
+  if (sessionError) throw sessionError
+  if (!session) return null
+  const { data, error } = await db()
+    .from('students')
+    .select('id,project_id,nickname')
+    .eq('id', session.student_id)
+    .single()
   if (error) throw error
-  return (Array.isArray(data) ? data[0] : data) as Student | null
+  return data as Student
+}
+export async function reopenTrip(id: string) {
+  const { error } = await db().rpc('reopen_trip', { p_trip: id })
+  if (error) throw error
 }
 export async function loadTrip(studentId: string): Promise<Trip> {
   const { data, error } = await db()

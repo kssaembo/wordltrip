@@ -52,6 +52,22 @@ insert into packing_items(destination_id,text,checked) values('cccccccc-cccc-4cc
       { text: '여권', checked: true, destination_id: null, linked: true },
       { text: '우산', checked: false, destination_id: null, linked: true },
     ])
+    await sql.exec(readFileSync('supabase/migrations/202609160003_rejoin_reopen.sql', 'utf8'))
+    expect((await sql.query('select * from student_sessions')).rows).toHaveLength(2)
+    await sql.query("select set_config('request.jwt.claim.sub',$1,false)", [teacher])
+    await sql.query("select set_config('request.jwt.claims',$1,false)", ['{"is_anonymous":false}'])
+    await sql.query("select reopen_trip('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2')")
+    expect(
+      (
+        await sql.query(
+          "select country_code,kind from destinations where trip_id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2' order by visit_order",
+        )
+      ).rows,
+    ).toEqual([
+      { country_code: 'KR', kind: 'departure' },
+      { country_code: 'FR', kind: 'visit' },
+    ])
+    expect((await sql.query('select * from packing_items')).rows).toHaveLength(2)
   } finally {
     await sql.close()
   }
