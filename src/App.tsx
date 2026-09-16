@@ -1,3 +1,4 @@
+import { readDraft, storeDraft, clearDraft, downloadDraft } from './lib/drafts'
 import { ResearchLinks } from './components/ResearchLinks'
 import { Flag } from './components/Flag'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -51,7 +52,7 @@ function Brand() {
   return (
     <div className="brand">
       <span>
-        <Globe2 size={26} />
+        <img src="/pwa/icon-192.png" alt="" width="42" height="42" />
       </span>
       <div>
         지구 한 바퀴<small>MY WORLD JOURNAL</small>
@@ -71,9 +72,11 @@ export default function App() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [dirty, setDirty] = useState(false)
+  const [recovery, setRecovery] = useState<Trip | null>(null)
   const [confirm, setConfirm] = useState<'submit' | 'exit' | null>(null)
   const [portfolio, setPortfolio] = useState<{ trip: Trip; student: Student } | null>(null)
   const actionLock = useRef(false)
+  const changeVersion = useRef(0)
   const uploadUrls = useRef<string[]>([])
   useEffect(() => {
     let live = true
@@ -93,6 +96,7 @@ export default function App() {
           if (live) {
             setStudent(s)
             setTrip(t)
+            setRecovery(readDraft(t.id))
             setSelected(t.destinations[0]?.id || '')
           }
         }
@@ -132,18 +136,58 @@ export default function App() {
     }
   }, [])
   const change = (next: Trip) => {
+    changeVersion.current += 1
+    if (!demo) {
+      try {
+        storeDraft(next)
+      } catch {
+        setError('기기 임시 보관 공간이 부족합니다. 저장 버튼을 눌러 서버에 저장해 주세요.')
+      }
+    }
     setTrip(next)
     setDirty(true)
     setNotice('')
   }
-  async function persist(t = trip) {
-    if (!t) return
-    if (!demo) await api.saveTrip(t)
-    setDirty(false)
-    setNotice(
-      demo ? '체험 내용입니다. 이 화면을 나가면 사라집니다.' : '모든 변경 사항을 저장했어요.',
-    )
-  }
+  const persist = useCallback(
+    async (t = trip) => {
+      if (!t) return
+      const changeAtStart = changeVersion.current
+      const revision = demo ? t.revision : await api.saveTrip(t)
+      setTrip((current) => (current?.id === t.id ? { ...current, revision } : current))
+      if (changeVersion.current !== changeAtStart) {
+        if (!demo) {
+          try {
+            const latest = readDraft(t.id)
+            if (latest) storeDraft({ ...latest, revision })
+          } catch {
+            setError('추가 변경의 임시 보관에 실패했습니다. 저장 버튼을 눌러 주세요.')
+          }
+        }
+        setDirty(true)
+        return
+      }
+      if (!demo) {
+        try {
+          clearDraft(t.id)
+        } catch {
+          /* Keep the server save successful even if local storage is unavailable. */
+        }
+      }
+      setRecovery(null)
+      setDirty(false)
+      setNotice(
+        demo ? '체험 내용입니다. 이 화면을 나가면 사라집니다.' : '모든 변경 사항을 저장했어요.',
+      )
+    },
+    [trip, demo],
+  )
+  useEffect(() => {
+    if (!dirty || demo || !trip || trip.submitted) return
+    const timer = setTimeout(() => {
+      if (!actionLock.current) void run(() => persist())
+    }, 2500)
+    return () => clearTimeout(timer)
+  }, [trip, dirty, demo, run, persist])
   function selectCountry(c: Country) {
     if (!trip) return
     if (trip.submitted || busy) return
@@ -194,12 +238,16 @@ export default function App() {
         uploadUrls.current.push(url)
         photo = { id: crypto.randomUUID(), storage_path: 'demo', url }
       } else photo = await api.uploadPhoto(student.project_id, student.id, current, blob)
-      setTrip({
-        ...trip,
-        destinations: trip.destinations.map((d) =>
-          d.id === current.id ? { ...d, travel_photos: [...d.travel_photos, photo] } : d,
-        ),
-      })
+      setTrip((latest) =>
+        latest
+          ? {
+              ...latest,
+              destinations: latest.destinations.map((d) =>
+                d.id === current.id ? { ...d, travel_photos: [...d.travel_photos, photo] } : d,
+              ),
+            }
+          : latest,
+      )
       setNotice(`사진을 압축해 저장했어요. (${Math.round(blob.size / 1024)}KB · WebP)`)
     })
   }
@@ -234,7 +282,10 @@ export default function App() {
           .filter((x) => x.id !== d.id)
           .map((x, i) => ({ ...x, visit_order: i })),
       }
-      if (!demo) await api.saveTrip(next)
+      if (!demo) {
+        next.revision = await api.saveTrip(next)
+        clearDraft(next.id)
+      }
       setTrip(next)
       setDirty(false)
       setSelected(next.destinations[0]?.id || '')
@@ -254,12 +305,14 @@ export default function App() {
   async function leave() {
     await run(async () => {
       if (!demo) {
+        if (dirty) await persist()
         const { error } = await db().auth.signOut()
         if (error) throw error
       }
       uploadUrls.current.forEach(URL.revokeObjectURL)
       uploadUrls.current = []
       setTrip(null)
+      setRecovery(null)
       setStudent(null)
       setTeacher(false)
       setDemo(false)
@@ -310,6 +363,7 @@ export default function App() {
           const t = await api.loadTrip(s.id)
           setStudent(s)
           setTrip(t)
+          setRecovery(readDraft(t.id))
           setSelected(t.destinations[0]?.id || '')
         }}
         onDemo={() => {
@@ -436,6 +490,45 @@ export default function App() {
               </button>
             </div>
           </div>
+          {recovery && (
+            <div className="notice no-print">
+              <strong>이 기기에 저장되지 않은 임시본이 있어요.</strong>
+              <p>
+                서버 기록을 확인한 뒤 복원하세요. 다른 기기에서 바뀐 기록은 자동으로 덮어쓰지
+                않습니다.
+              </p>
+              <button onClick={() => downloadDraft(recovery)}>임시본 다운로드</button>
+              <button
+                disabled={trip.submitted || (recovery.revision ?? 0) !== (trip.revision ?? 0)}
+                onClick={() => {
+                  change({
+                    ...recovery,
+                    destinations: recovery.destinations.map((d) => ({
+                      ...d,
+                      travel_photos:
+                        trip.destinations.find((x) => x.id === d.id)?.travel_photos ?? [],
+                    })),
+                  })
+                  setRecovery(null)
+                }}
+              >
+                임시본 복원
+              </button>
+              <button
+                onClick={() => {
+                  clearDraft(trip.id)
+                  setRecovery(null)
+                }}
+              >
+                서버 기록 사용
+              </button>
+            </div>
+          )}
+          {dirty && !demo && (
+            <button className="no-print" onClick={() => downloadDraft(trip)}>
+              임시본 다운로드
+            </button>
+          )}
           {error && (
             <div className="error" role="alert">
               {error}
@@ -625,7 +718,7 @@ export default function App() {
           text={
             demo
               ? '작성한 체험 내용이 사라집니다.'
-              : `${dirty ? '저장하지 않은 변경 사항은 사라집니다. ' : ''}같은 학급 코드와 닉네임을 입력하면 다른 기기에서도 다시 접속할 수 있어요.`
+              : `${dirty ? '변경 사항을 서버에 저장한 뒤 로그아웃합니다. 저장에 실패하면 이 화면을 유지합니다. ' : ''}같은 학급 코드와 닉네임을 입력하면 다른 기기에서도 다시 접속할 수 있어요.`
           }
           onCancel={() => setConfirm(null)}
           onConfirm={() => void leave()}
@@ -897,13 +990,21 @@ function TeacherDashboard({
   const [title, setTitle] = useState('')
   const [reopen, setReopen] = useState<{ id: string; nickname: string } | null>(null)
   const [reopenNotice, setReopenNotice] = useState('')
+  const [showDeleted, setShowDeleted] = useState(false)
+  const [archive, setArchive] = useState<{
+    kind: 'project' | 'student'
+    id: string
+    name: string
+    restore: boolean
+  } | null>(null)
   const [students, setStudents] = useState<Awaited<ReturnType<typeof api.roster>>>([])
   useEffect(() => {
     void run(async () => {
       const list = await api.getProjects()
       setProjects(list)
-      setProject(list[0]?.id || '')
-      if (list[0]) setStudents(await api.roster(list[0].id))
+      const first = list.find((p) => !p.deleted_at)
+      setProject(first?.id || '')
+      if (first) setStudents(await api.roster(first.id))
     })
   }, [run])
   async function choose(id: string) {
@@ -958,17 +1059,38 @@ function TeacherDashboard({
             </button>
           </form>
         </section>
+        <button onClick={() => setShowDeleted(!showDeleted)}>
+          {showDeleted ? '삭제 항목 숨기기' : '삭제 항목 보기·복구'}
+        </button>
         <div className="project-tabs">
-          {projects.map((p) => (
-            <button
-              key={p.id}
-              disabled={busy}
-              className={p.id === project ? 'active' : ''}
-              onClick={() => void choose(p.id)}
-            >
-              {p.title}
-            </button>
-          ))}
+          {projects
+            .filter((p) => showDeleted || !p.deleted_at)
+            .map((p) => (
+              <div key={p.id}>
+                <button
+                  disabled={busy}
+                  className={p.id === project ? 'active' : ''}
+                  onClick={() => void choose(p.id)}
+                >
+                  {p.title}
+                  {p.deleted_at ? ' (삭제됨)' : ''}
+                </button>
+                <button
+                  disabled={busy}
+                  aria-label={p.title + (p.deleted_at ? ' 프로젝트 복구' : ' 프로젝트 삭제')}
+                  onClick={() =>
+                    setArchive({
+                      kind: 'project',
+                      id: p.id,
+                      name: p.title,
+                      restore: !!p.deleted_at,
+                    })
+                  }
+                >
+                  {p.deleted_at ? '복구' : '×'}
+                </button>
+              </div>
+            ))}
         </div>
         {project && (
           <section className="panel roster">
@@ -984,7 +1106,8 @@ function TeacherDashboard({
               </div>
               <div>
                 <span>
-                  {students.filter((s) => s.trips[0]?.submitted).length} / {students.length}명 제출
+                  {students.filter((s) => !s.deleted_at && s.trips[0]?.submitted).length} /{' '}
+                  {students.filter((s) => !s.deleted_at).length}명 제출
                 </span>
                 <button
                   disabled={busy}
@@ -1002,45 +1125,72 @@ function TeacherDashboard({
                   <th>제출 상태</th>
                   <th>포트폴리오</th>
                   <th>제출 관리</th>
+                  <th>학생 삭제</th>
                 </tr>
               </thead>
               <tbody>
-                {students.map((s) => (
-                  <tr key={s.id}>
-                    <td>{s.nickname}</td>
-                    <td>
-                      <span className={`status-pill ${s.trips[0]?.submitted ? 'done' : ''}`}>
-                        {s.trips[0]?.submitted ? (
-                          <>
-                            <CheckCircle2 size={14} /> 제출 완료
-                          </>
-                        ) : (
-                          '작성 중'
-                        )}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        disabled={busy || !s.trips[0]?.submitted}
-                        onClick={() =>
-                          void run(async () => {
-                            onView(await api.loadTrip(s.id), s)
-                          })
-                        }
-                      >
-                        전체화면 열람 <ArrowRight size={15} />
-                      </button>
-                    </td>
-                    <td>
-                      <button
-                        disabled={busy || !s.trips[0]?.submitted}
-                        onClick={() => setReopen({ id: s.trips[0].id, nickname: s.nickname })}
-                      >
-                        제출 취소
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {students
+                  .filter((s) => showDeleted || !s.deleted_at)
+                  .map((s) => (
+                    <tr key={s.id}>
+                      <td>
+                        {s.nickname}
+                        {s.deleted_at ? ' (삭제됨)' : ''}
+                      </td>
+                      <td>
+                        <span className={`status-pill ${s.trips[0]?.submitted ? 'done' : ''}`}>
+                          {s.trips[0]?.submitted ? (
+                            <>
+                              <CheckCircle2 size={14} /> 제출 완료
+                            </>
+                          ) : (
+                            '작성 중'
+                          )}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          disabled={
+                            busy ||
+                            !!s.deleted_at ||
+                            !!projects.find((p) => p.id === project)?.deleted_at ||
+                            !s.trips[0]?.submitted
+                          }
+                          onClick={() =>
+                            void run(async () => {
+                              onView(await api.loadTrip(s.id), s)
+                            })
+                          }
+                        >
+                          전체화면 열람 <ArrowRight size={15} />
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          disabled={busy || !s.trips[0]?.submitted}
+                          onClick={() => setReopen({ id: s.trips[0].id, nickname: s.nickname })}
+                        >
+                          제출 취소
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          disabled={busy}
+                          aria-label={s.nickname + (s.deleted_at ? ' 학생 복구' : ' 학생 삭제')}
+                          onClick={() =>
+                            setArchive({
+                              kind: 'student',
+                              id: s.id,
+                              name: s.nickname,
+                              restore: !!s.deleted_at,
+                            })
+                          }
+                        >
+                          {s.deleted_at ? '복구' : '×'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
             {!students.length && (
@@ -1068,6 +1218,36 @@ function TeacherDashboard({
               setReopen(null)
               setReopenNotice('제출을 취소했습니다. 학생이 새로고침하면 다시 작성할 수 있어요.')
               setStudents(await api.roster(project))
+            })
+          }
+        />
+      )}
+      {archive && (
+        <Confirm
+          title={archive.name + (archive.restore ? '을(를) 복구할까요?' : '을(를) 삭제할까요?')}
+          text={
+            archive.restore
+              ? '보관된 기록을 다시 사용할 수 있습니다.'
+              : '목록에서 숨기고 학생 접근을 차단합니다. 기록·사진은 보관되며 삭제 항목 보기에서 복구할 수 있습니다.'
+          }
+          busy={busy}
+          onCancel={() => setArchive(null)}
+          onConfirm={() =>
+            void run(async () => {
+              await api.archiveRecord(archive.kind, archive.id, archive.restore)
+              const list = await api.getProjects()
+              setProjects(list)
+              let selectedProject = project
+              if (archive.kind === 'project' && !archive.restore && archive.id === project)
+                selectedProject = list.find((p) => !p.deleted_at)?.id ?? ''
+              setProject(selectedProject)
+              setStudents(selectedProject ? await api.roster(selectedProject) : [])
+              setReopenNotice(
+                archive.restore
+                  ? '복구했습니다.'
+                  : '삭제했습니다. 삭제 항목 보기에서 복구할 수 있습니다.',
+              )
+              setArchive(null)
             })
           }
         />

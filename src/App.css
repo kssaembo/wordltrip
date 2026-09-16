@@ -2096,3 +2096,93 @@ fieldset {
 .exchange-warning {
   color: #996011;
 }
+.brand > span {
+  padding: 0;
+  overflow: hidden;
+  background: #f5f3ed;
+}
+.brand img {
+  display: block;
+  width: 42px;
+  height: 42px;
+  object-fit: cover;
+}
+.packing-add {
+  display: flex;
+  gap: 10px;
+}
+.packing-add input {
+  flex: 1;
+  min-width: 0;
+  width: 0;
+}
+.packing-add button {
+  flex: 0 0 100px;
+  white-space: nowrap;
+}
+.places-input {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.places-input > .packing-add {
+  margin-top: 8px;
+}
+.place-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.place-chips > span {
+  display: flex;
+  align-items: center;
+  background: #e8f3ee;
+  border-radius: 8px;
+  padding: 3px 7px;
+  overflow-wrap: anywhere;
+}
+.place-chips button {
+  padding: 5px;
+}
+.home-summary {
+  margin: 20px 0;
+  padding: 16px 20px;
+  border: 1px solid #cbded5;
+  border-radius: 12px;
+  background: #eff6f2;
+  overflow-wrap: anywhere;
+}
+.home-summary h3 {
+  margin: 0 0 8px;
+}
+.home-summary p {
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 6px 0;
+}
+.portfolio-destination h2 small,
+.stamp > span {
+  white-space: pre-line;
+}
+@media print {
+  .cover-meta {
+    margin-bottom: 8mm;
+  }
+  .cover-stats {
+    margin-top: 5mm;
+  }
+  .home-summary {
+    margin: 5mm 0;
+    padding: 3mm 4mm;
+  }
+  .portfolio-cover h1 {
+    font-size: 26pt;
+  }
+  .home-summary p {
+    font-size: 9pt;
+  }
+  .passport-page .passport {
+    padding-top: 4mm;
+  }
+}

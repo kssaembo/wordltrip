@@ -4,7 +4,7 @@ import { ArrowLeft, Download, Expand, BookOpen } from 'lucide-react'
 import { WorldMap } from './WorldMap'
 import { loadCountries } from '../lib/countries'
 import { costFields, destinationCost, totalCost, money, visits, stopLabel } from '../lib/model'
-import type { Trip, Student } from '../lib/model'
+import type { Trip, Student, Destination } from '../lib/model'
 export function Passport({ trip, student }: { trip: Trip; student: Student }) {
   return (
     <section className="passport">
@@ -31,6 +31,22 @@ export function Passport({ trip, student }: { trip: Trip; student: Student }) {
       </div>
       {!visits(trip).length && <p>여행지를 추가하면 나만의 스탬프가 생겨요.</p>}
     </section>
+  )
+}
+function HomeSummary({ destination, trip }: { destination: Destination | undefined; trip: Trip }) {
+  if (!destination) return null
+  return (
+    <div className="home-summary">
+      <h3>대한민국 {stopLabel(destination)}</h3>
+      <p>
+        {destination.visit_date || '날짜 미정'} {destination.visit_time?.slice(0, 5) || '시간 미정'}
+      </p>
+      <p>
+        <strong>공통 준비물</strong>{' '}
+        {trip.packing_items.map((p) => (p.checked ? '☑ ' : '☐ ') + p.text).join(' · ') ||
+          '등록한 준비물이 없어요.'}
+      </p>
+    </div>
   )
 }
 export function Portfolio({
@@ -90,7 +106,8 @@ export function Portfolio({
         </div>
       </div>
       <p className="print-tip no-print">
-        인쇄 창에서 대상을 ‘PDF로 저장’, 용지를 A4로 선택해 주세요.
+        인쇄 창에서 ‘PDF로 저장’ · A4를 선택하고, ‘설정 더보기 → 머리글과 바닥글’을 꺼 주세요.
+        날짜·파일명·주소가 사라집니다. 배경 그래픽을 켜면 화면 색상도 출력됩니다.
       </p>
       {error && (
         <p role="alert" className="error no-print">
@@ -128,8 +145,12 @@ export function Portfolio({
               <strong>{money(totalCost(trip))}</strong>
             </div>
           </div>
+          <HomeSummary
+            destination={trip.destinations.find((d) => d.kind === 'departure')}
+            trip={trip}
+          />
         </section>
-        {trip.destinations.map((d, i) => (
+        {visits(trip).map((d, i) => (
           <section className="portfolio-destination print-page" key={d.id}>
             <div className="chapter">
               <span>CHAPTER {String(i + 1).padStart(2, '0')}</span>
@@ -213,6 +234,10 @@ export function Portfolio({
           </section>
         ))}
         <section className="print-page passport-page">
+          <HomeSummary
+            destination={trip.destinations.find((d) => d.kind === 'arrival')}
+            trip={trip}
+          />
           <Passport trip={trip} student={student} />
           <p className="ending">여행은 끝나도, 호기심은 계속됩니다.</p>
         </section>

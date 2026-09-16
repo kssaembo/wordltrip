@@ -50,6 +50,12 @@ beforeAll(async () => {
       'utf8',
     ),
   )
+  await sql.exec(
+    readFileSync(
+      new URL('../supabase/migrations/202609160004_archive_revision.sql', import.meta.url),
+      'utf8',
+    ),
+  )
   await asUser(teacher, false)
   project = (
     await one<{ p: { id: string; class_code: string } }>(
@@ -106,7 +112,12 @@ describe('실제 PostgreSQL RLS 및 서버 쓰기 권한', () => {
   it('학생은 다른 학생 여행과 직접 소유자/제출 상태를 수정할 수 없다', async () => {
     await asUser(alice)
     await expect(
-      sql.query('select save_trip($1,$2,$3,$4)', [bt, '침입', '[]', '[]']),
+      sql.query('select save_trip($1,$2,$3,$4,(select revision from trips where id=$1))', [
+        bt,
+        '침입',
+        '[]',
+        '[]',
+      ]),
     ).rejects.toThrow()
     await expect(sql.query('update trips set submitted=true where id=$1', [at])).rejects.toThrow()
     await expect(
@@ -130,7 +141,7 @@ describe('실제 PostgreSQL RLS 및 서버 쓰기 권한', () => {
     d.transport_cost = 100000
     const packing = [{ id: crypto.randomUUID(), text: '여권', checked: true }]
     route = [departure, { ...d, visit_order: 1 }]
-    await sql.query('select save_trip($1,$2,$3,$4)', [
+    await sql.query('select save_trip($1,$2,$3,$4,(select revision from trips where id=$1))', [
       at,
       '첫 여행',
       JSON.stringify(route),
@@ -149,14 +160,19 @@ describe('실제 PostgreSQL RLS 및 서버 쓰기 권한', () => {
     }
     const d = { ...newDestination('JP', '일본', 1), id: did }
     await expect(
-      sql.query('select save_trip($1,$2,$3,$4)', [bt, '변경', JSON.stringify([bd, d]), '[]']),
+      sql.query('select save_trip($1,$2,$3,$4,(select revision from trips where id=$1))', [
+        bt,
+        '변경',
+        JSON.stringify([bd, d]),
+        '[]',
+      ]),
     ).rejects.toThrow()
     expect((await one<{ title: string }>('select title from trips')).title).toBe('나의 첫 세계여행')
   })
   it('출발지 삭제/교체와 중간 귀국 지점을 거부한다', async () => {
     await asUser(alice)
     await expect(
-      sql.query('select save_trip($1,$2,$3,$4)', [
+      sql.query('select save_trip($1,$2,$3,$4,(select revision from trips where id=$1))', [
         at,
         '잘못된 여행',
         JSON.stringify(route.slice(1)),
@@ -164,7 +180,7 @@ describe('실제 PostgreSQL RLS 및 서버 쓰기 권한', () => {
       ]),
     ).rejects.toThrow('출발지는 대한민국')
     await expect(
-      sql.query('select save_trip($1,$2,$3,$4)', [
+      sql.query('select save_trip($1,$2,$3,$4,(select revision from trips where id=$1))', [
         at,
         '잘못된 여행',
         JSON.stringify([{ ...departure, id: crypto.randomUUID() }, route[1]]),
@@ -172,7 +188,7 @@ describe('실제 PostgreSQL RLS 및 서버 쓰기 권한', () => {
       ]),
     ).rejects.toThrow('삭제하거나 교체')
     await expect(
-      sql.query('select save_trip($1,$2,$3,$4)', [
+      sql.query('select save_trip($1,$2,$3,$4,(select revision from trips where id=$1))', [
         at,
         '잘못된 여행',
         JSON.stringify([departure, newHome('arrival', 1), route[1]]),
@@ -237,10 +253,20 @@ describe('실제 PostgreSQL RLS 및 서버 쓰기 권한', () => {
       '마지막 도착지를 대한민국으로 설정해주세요.',
     )
     route.push({ ...newHome('arrival', 2), visit_date: '2026-10-05', visit_time: '18:00' })
-    await sql.query('select save_trip($1,$2,$3,$4)', [at, '첫 여행', JSON.stringify(route), '[]'])
+    await sql.query('select save_trip($1,$2,$3,$4,(select revision from trips where id=$1))', [
+      at,
+      '첫 여행',
+      JSON.stringify(route),
+      '[]',
+    ])
     await sql.query('select submit_trip($1)', [at])
     await expect(
-      sql.query('select save_trip($1,$2,$3,$4)', [at, '수정', '[]', '[]']),
+      sql.query('select save_trip($1,$2,$3,$4,(select revision from trips where id=$1))', [
+        at,
+        '수정',
+        '[]',
+        '[]',
+      ]),
     ).rejects.toThrow()
     await expect(
       sql.query('insert into travel_photos(destination_id,storage_path) values($1,$2)', [
@@ -288,7 +314,12 @@ describe('실제 PostgreSQL RLS 및 서버 쓰기 권한', () => {
         .submitted,
     ).toBe(false)
     await asUser(outsider)
-    await sql.query('select save_trip($1,$2,$3,$4)', [at, '다시 작성', JSON.stringify(route), '[]'])
+    await sql.query('select save_trip($1,$2,$3,$4,(select revision from trips where id=$1))', [
+      at,
+      '다시 작성',
+      JSON.stringify(route),
+      '[]',
+    ])
     expect((await one<{ title: string }>('select title from trips')).title).toBe('다시 작성')
     const path = project.id + '/' + a.id + '/' + did + '/image.webp'
     expect(
@@ -301,9 +332,88 @@ describe('실제 PostgreSQL RLS 및 서버 쓰기 권한', () => {
     await sql.query('select join_class($1,$2)', [project.class_code, '새 여행자'])
     expect((await sql.query('select * from trips where id=$1', [at])).rows).toHaveLength(0)
     await expect(
-      sql.query('select save_trip($1,$2,$3,$4)', [at, '변경', JSON.stringify(route), '[]']),
+      sql.query('select save_trip($1,$2,$3,$4,(select revision from trips where id=$1))', [
+        at,
+        '변경',
+        JSON.stringify(route),
+        '[]',
+      ]),
     ).rejects.toThrow()
     expect((await sql.query('select * from students')).rows).toHaveLength(1)
+  })
+  it('오래된 저장 버전은 덮어쓰지 않고 기존 기록을 유지한다', async () => {
+    await asUser(bob)
+    const before = await one<{ title: string; revision: number }>(
+      'select title,revision from trips where id=$1',
+      [bt],
+    )
+    await expect(
+      sql.query('select save_trip($1,$2,$3,$4,$5)', [
+        bt,
+        '덮어쓰기',
+        '[]',
+        '[]',
+        before.revision - 1,
+      ]),
+    ).rejects.toThrow('다른 기기')
+    expect(await one('select title,revision from trips where id=$1', [bt])).toEqual(before)
+    const destinations = (
+      await sql.query('select * from destinations where trip_id=$1 order by visit_order', [bt])
+    ).rows
+    await sql.query('select save_trip($1,$2,$3,$4,$5)', [
+      bt,
+      '새 버전',
+      JSON.stringify(destinations),
+      '[]',
+      before.revision,
+    ])
+    await expect(
+      sql.query('select save_trip($1,$2,$3,$4,$5)', [
+        bt,
+        '오래된 기기',
+        JSON.stringify(destinations),
+        '[]',
+        before.revision,
+      ]),
+    ).rejects.toThrow('다른 기기')
+    expect((await one<{ title: string }>('select title from trips where id=$1', [bt])).title).toBe(
+      '새 버전',
+    )
+    await expect(
+      sql.query('select save_trip_unversioned_internal($1,$2,$3,$4)', [bt, '우회', '[]', '[]']),
+    ).rejects.toThrow()
+  })
+  it('학생 삭제는 담당 교사만 가능하며 기록·사진을 보관하고 복구한다', async () => {
+    await asUser(alice)
+    await expect(
+      sql.query('select archive_record($1,$2,false)', ['student', a.id]),
+    ).rejects.toThrow('담당 교사')
+    await asUser(outsider, false)
+    await expect(
+      sql.query('select archive_record($1,$2,false)', ['student', a.id]),
+    ).rejects.toThrow('담당 교사')
+    await asUser(teacher, false)
+    await sql.query('select archive_record($1,$2,false)', ['student', a.id])
+    expect((await sql.query('select * from travel_photos')).rows).toHaveLength(3)
+    await asUser(alice)
+    expect((await sql.query('select * from trips')).rows).toHaveLength(0)
+    await asUser(teacher, false)
+    await sql.query('select archive_record($1,$2,true)', ['student', a.id])
+    await asUser(alice)
+    expect((await sql.query('select * from travel_photos')).rows).toHaveLength(3)
+  })
+  it('프로젝트 삭제 후 참가를 차단하고 복구하면 기존 기록을 다시 연다', async () => {
+    await asUser(teacher, false)
+    await sql.query('select archive_record($1,$2,false)', ['project', project.id])
+    await asUser(alice)
+    expect((await sql.query('select * from trips')).rows).toHaveLength(0)
+    await expect(
+      sql.query('select join_class($1,$2)', [project.class_code, '여행자A']),
+    ).rejects.toThrow('학급 코드')
+    await asUser(teacher, false)
+    await sql.query('select archive_record($1,$2,true)', ['project', project.id])
+    await asUser(alice)
+    expect((await one<{ id: string }>('select id from trips')).id).toBe(at)
   })
 })
 it('금액은 숫자로 정확하게 합산하고 미완성 제출을 검출한다', () => {

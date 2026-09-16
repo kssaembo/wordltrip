@@ -1,3 +1,4 @@
+import { PlacesInput } from './PlacesInput'
 import { ExchangeCalculator } from './ExchangeCalculator'
 import { Flag } from './Flag'
 import { useState } from 'react'
@@ -97,15 +98,7 @@ export function DestinationEditor({
         {tab === 'plan' && (
           <>
             <div className="field-row">
-              <label>
-                도시 또는 관광지
-                <input
-                  value={d.city}
-                  maxLength={150}
-                  placeholder="예: 도쿄, 피라미드"
-                  onChange={(e) => patch({ city: e.target.value })}
-                />
-              </label>
+              <PlacesInput value={d.city} onChange={(city) => patch({ city })} />
               <label>
                 여행 예정 날짜
                 <input

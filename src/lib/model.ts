@@ -22,6 +22,7 @@ export type Destination = {
   travel_photos: Photo[]
 }
 export type Trip = {
+  revision?: number
   id: string
   student_id: string
   title: string
@@ -29,8 +30,13 @@ export type Trip = {
   submitted: boolean
   destinations: Destination[]
 }
-export type Student = { id: string; project_id: string; nickname: string }
-export type Project = { id: string; title: string; class_code: string }
+export type Student = {
+  deleted_at?: string | null
+  id: string
+  project_id: string
+  nickname: string
+}
+export type Project = { deleted_at?: string | null; id: string; title: string; class_code: string }
 export const costFields = [
   ['transport_cost', '교통비'],
   ['accommodation_cost', '숙박비'],

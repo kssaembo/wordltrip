@@ -28,9 +28,9 @@ export async function myStudent() {
     .from('students')
     .select('id,project_id,nickname')
     .eq('id', session.student_id)
-    .single()
+    .maybeSingle()
   if (error) throw error
-  return data as Student
+  return data as Student | null
 }
 export async function reopenTrip(id: string) {
   const { error } = await db().rpc('reopen_trip', { p_trip: id })
@@ -59,13 +59,15 @@ export async function loadTrip(studentId: string): Promise<Trip> {
   return trip
 }
 export async function saveTrip(trip: Trip) {
-  const { error } = await db().rpc('save_trip', {
+  const { data, error } = await db().rpc('save_trip', {
     p_trip: trip.id,
+    p_revision: trip.revision ?? 0,
     p_title: trip.title,
     p_packing: trip.packing_items,
     p_destinations: trip.destinations.map(({ travel_photos: _photos, ...d }) => d),
   })
   if (error) throw error
+  return data as number
 }
 export async function submitTrip(id: string) {
   const { error } = await db().rpc('submit_trip', { p_trip: id })
@@ -88,7 +90,7 @@ export async function createProject(title: string) {
 export async function roster(projectId: string) {
   const { data, error } = await db()
     .from('students')
-    .select('id, project_id, nickname, trips(id, submitted)')
+    .select('id, project_id, nickname, deleted_at, trips(id, submitted)')
     .eq('project_id', projectId)
     .order('created_at')
   if (error) throw error
@@ -140,4 +142,9 @@ export function explainError(e: unknown) {
   if (/schema cache|does not exist/i.test(message))
     return '데이터베이스 초기 설정이 필요합니다. README의 SQL 마이그레이션을 적용해 주세요.'
   return message
+}
+
+export async function archiveRecord(kind: 'project' | 'student', id: string, restore = false) {
+  const { error } = await db().rpc('archive_record', { p_kind: kind, p_id: id, p_restore: restore })
+  if (error) throw error
 }
