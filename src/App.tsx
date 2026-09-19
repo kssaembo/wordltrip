@@ -1,3 +1,4 @@
+import { teacherIdentity } from './lib/teacherAuth'
 import { readDraft, storeDraft, clearDraft, downloadDraft } from './lib/drafts'
 import { ResearchLinks } from './components/ResearchLinks'
 import { Flag } from './components/Flag'
@@ -797,7 +798,7 @@ function Entry({
   const [role, setRole] = useState('student')
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+  const [loginId, setLoginId] = useState('')
   const [password, setPassword] = useState('')
   const [signup, setSignup] = useState(false)
   const [message, setMessage] = useState('')
@@ -862,14 +863,24 @@ function Entry({
             onSubmit={(e) => {
               e.preventDefault()
               void run(async () => {
+                setMessage('')
                 if (role === 'student') await onJoin(code, name)
                 else if (signup) {
-                  const { data, error } = await db().auth.signUp({ email, password })
+                  const { data, error } = await db().auth.signUp({
+                    email: teacherIdentity(loginId, true),
+                    password,
+                  })
                   if (error) throw error
                   if (data.session) onTeacher()
-                  else setMessage('인증 이메일을 확인한 뒤 로그인해 주세요.')
+                  else
+                    setMessage(
+                      '즉시 가입 설정이 아직 적용되지 않았습니다. 관리자에게 Supabase의 Confirm Email 해제를 요청해 주세요. 이 아이디가 이미 생성되었다면 관리자가 해당 계정의 확인 상태도 처리해야 합니다.',
+                    )
                 } else {
-                  const { error } = await db().auth.signInWithPassword({ email, password })
+                  const { error } = await db().auth.signInWithPassword({
+                    email: teacherIdentity(loginId),
+                    password,
+                  })
                   if (error) throw error
                   onTeacher()
                 }
@@ -908,13 +919,15 @@ function Entry({
             ) : (
               <>
                 <label>
-                  이메일
+                  {signup ? '아이디' : '아이디 또는 기존 이메일'}
                   <input
-                    type="email"
+                    type="text"
                     autoComplete="username"
                     required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={signup ? '영문·숫자·밑줄 3~24자' : '아이디 또는 기존 이메일'}
+                    maxLength={signup ? 24 : 254}
+                    value={loginId}
+                    onChange={(e) => setLoginId(e.target.value)}
                   />
                 </label>
                 <label>
@@ -922,12 +935,18 @@ function Entry({
                   <input
                     type="password"
                     autoComplete={signup ? 'new-password' : 'current-password'}
-                    minLength={8}
+                    minLength={signup ? 8 : undefined}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </label>
+                {signup && (
+                  <p className="fineprint">
+                    이메일 없이 가입합니다. 비밀번호는 8자 이상으로 입력하세요. 비밀번호를 잊으면
+                    관리자에게 문의해야 합니다.
+                  </p>
+                )}
               </>
             )}
             <button className="primary entry-submit" disabled={busy}>

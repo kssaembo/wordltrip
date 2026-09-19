@@ -137,6 +137,11 @@ export function explainError(e: unknown) {
       : typeof e === 'object' && e && 'message' in e
         ? String(e.message)
         : '요청을 처리하지 못했습니다.'
+  if (/invalid login credentials/i.test(message)) return '아이디 또는 비밀번호를 확인해 주세요.'
+  if (/user already registered/i.test(message))
+    return '이미 사용 중인 아이디입니다. 로그인하거나 다른 아이디를 입력해 주세요.'
+  if (/email not confirmed/i.test(message))
+    return '계정의 확인 상태를 관리자가 확인해야 합니다. 관리자에게 문의해 주세요.'
   if (/anonymous.*disabled/i.test(message))
     return '학생 참가를 위해 Supabase의 익명 로그인을 켜야 합니다. 선생님에게 알려주세요.'
   if (/schema cache|does not exist/i.test(message))
