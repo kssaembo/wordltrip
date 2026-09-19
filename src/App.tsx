@@ -359,8 +359,8 @@ export default function App() {
         error={error}
         run={run}
         onTeacher={() => setTeacher(true)}
-        onJoin={async (code, name) => {
-          const s = await api.joinClass(code, name)
+        onJoin={async (code, name, pin) => {
+          const s = await api.joinClass(code, name, pin)
           const t = await api.loadTrip(s.id)
           setStudent(s)
           setTrip(t)
@@ -447,6 +447,17 @@ export default function App() {
           </div>
         </aside>
         <main className="workspace">
+          <details className="privacy-note">
+            <summary>내 기록을 안전하게 지키는 약속</summary>
+            <p>
+              실명·연락처·주소는 적지 마세요. 학급 코드와 PIN은 친구에게 알려주지 마세요. 다른
+              사람의 사진은 허락 없이 올리지 마세요.
+            </p>
+            <p>
+              제출한 기록과 사진은 담당 선생님이 볼 수 있어요. 보관 기간은 선생님께 확인하고, 삭제를
+              원하면 선생님께 요청하세요. 공용 기기에서는 저장을 마친 뒤 꼭 로그아웃하세요.
+            </p>
+          </details>
           {demo && (
             <div className="demo-banner">
               체험 모드 · 내용은 이 화면에서만 유지됩니다. 실제 저장·제출은 학급 코드로 참가해
@@ -792,12 +803,13 @@ function Entry({
   error: string
   run: (fn: () => Promise<void>) => Promise<void>
   onTeacher: () => void
-  onJoin: (c: string, n: string) => Promise<void>
+  onJoin: (c: string, n: string, pin: string) => Promise<void>
   onDemo: () => void
 }) {
   const [role, setRole] = useState('student')
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
+  const [pin, setPin] = useState('')
   const [loginId, setLoginId] = useState('')
   const [password, setPassword] = useState('')
   const [signup, setSignup] = useState(false)
@@ -864,7 +876,7 @@ function Entry({
               e.preventDefault()
               void run(async () => {
                 setMessage('')
-                if (role === 'student') await onJoin(code, name)
+                if (role === 'student') await onJoin(code, name, pin)
                 else if (signup) {
                   const { data, error } = await db().auth.signUp({
                     email: teacherIdentity(loginId, true),
@@ -911,9 +923,29 @@ function Entry({
                     onChange={(e) => setName(e.target.value)}
                   />
                 </label>
+                <label>
+                  나의 PIN (숫자 4자리)
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    required
+                    pattern="[0-9]{4}"
+                    minLength={4}
+                    maxLength={4}
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                    placeholder="처음에는 설정할 PIN, 다음에는 같은 PIN"
+                  />
+                </label>
                 <p className="fineprint">
-                  같은 학급 코드와 닉네임으로 기존 기록을 이어서 열어요. 다른 사람의 닉네임은
-                  사용하지 마세요.
+                  처음 참가하면 입력한 PIN으로 설정돼요. 다음에는 같은 학급 코드·닉네임·PIN으로
+                  접속하세요. 기존 학생의 첫 PIN이나 분실한 PIN은 선생님께 요청하세요. 5회 틀리면
+                  5분 후 자동 해제돼요.
+                </p>
+                <p className="fineprint">
+                  실명·연락처·주소 입력과 타인 사진 무단 업로드는 하지 마세요. PIN은 공유하지 말고,
+                  공용 기기에서는 저장 후 로그아웃하세요.
                 </p>
               </>
             ) : (
@@ -1009,6 +1041,8 @@ function TeacherDashboard({
   const [title, setTitle] = useState('')
   const [reopen, setReopen] = useState<{ id: string; nickname: string } | null>(null)
   const [reopenNotice, setReopenNotice] = useState('')
+  const [pinStudent, setPinStudent] = useState<Student | null>(null)
+  const [newPin, setNewPin] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
   const [archive, setArchive] = useState<{
     kind: 'project' | 'student'
@@ -1046,6 +1080,18 @@ function TeacherDashboard({
         <p className="eyebrow">CLASSROOM JOURNEYS</p>
         <h1>우리 반의 세계여행</h1>
         <p className="muted">학생들의 여행이 한 권의 기록책으로 완성되는 곳.</p>
+        <div className="privacy-note">
+          <strong>프로젝트 종료 후 자료 정리</strong>
+          <p>
+            개인정보 보호를 위해 완료된 포트폴리오를 PDF로 다운로드하여 안전한 곳에 보관하고
+            프로젝트를 삭제해 주세요. 학생에게 열람 범위와 보관·삭제 시점을 안내해 주세요.
+          </p>
+          <p>
+            현재 삭제는 접근을 차단하는 복구 가능한 보관 처리입니다. DB 기록·사진은 남으므로 보관
+            기간이 끝나면 운영자가 Supabase의 DB와 Storage에서 함께 영구 삭제해야 합니다. 내려받은
+            PDF도 보관 기간 후 삭제해 주세요.
+          </p>
+        </div>
         {error && (
           <p className="error" role="alert">
             {error}
@@ -1144,6 +1190,7 @@ function TeacherDashboard({
                   <th>제출 상태</th>
                   <th>포트폴리오</th>
                   <th>제출 관리</th>
+                  <th>PIN 관리</th>
                   <th>학생 삭제</th>
                 </tr>
               </thead>
@@ -1194,6 +1241,21 @@ function TeacherDashboard({
                       </td>
                       <td>
                         <button
+                          disabled={
+                            busy ||
+                            !!s.deleted_at ||
+                            !!projects.find((p) => p.id === project)?.deleted_at
+                          }
+                          onClick={() => {
+                            setNewPin('')
+                            setPinStudent(s)
+                          }}
+                        >
+                          PIN 설정·초기화
+                        </button>
+                      </td>
+                      <td>
+                        <button
                           disabled={busy}
                           aria-label={s.nickname + (s.deleted_at ? ' 학생 복구' : ' 학생 삭제')}
                           onClick={() =>
@@ -1220,6 +1282,70 @@ function TeacherDashboard({
           </section>
         )}
       </main>
+      {pinStudent && (
+        <div className="modal-backdrop">
+          <section
+            className="panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pin-title"
+            style={{ padding: 24, maxWidth: 460 }}
+          >
+            <h2 id="pin-title">{pinStudent.nickname}의 PIN 설정·초기화</h2>
+            <p>
+              학생 본인을 확인한 뒤 새 PIN을 알려 주세요. PIN 오류 제한을 해제하고 기존 기기의
+              접근을 종료합니다. 저장된 기록은 유지됩니다.
+            </p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                void run(async () => {
+                  await api.resetStudentPin(pinStudent.id, newPin)
+                  setPinStudent(null)
+                  setNewPin('')
+                  setReopenNotice('PIN을 설정했습니다. 학생은 새 PIN으로 다시 접속해 주세요.')
+                })
+              }}
+            >
+              <label>
+                새 PIN (숫자 4자리)
+                <input
+                  autoFocus
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  required
+                  pattern="[0-9]{4}"
+                  maxLength={4}
+                  value={newPin}
+                  onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+                />
+              </label>
+              <p className="fineprint">
+                기기 자체의 과도한 접속 제한은 최대 5분 뒤 자동 해제됩니다.
+              </p>
+              {error && (
+                <p className="error" role="alert">
+                  {error}
+                </p>
+              )}
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setPinStudent(null)
+                  setNewPin('')
+                }}
+              >
+                취소
+              </button>
+              <button className="primary" disabled={busy || newPin.length !== 4}>
+                PIN 저장·제한 해제
+              </button>
+            </form>
+          </section>
+        </div>
+      )}
       {reopenNotice && (
         <p className="notice" role="status">
           {reopenNotice}

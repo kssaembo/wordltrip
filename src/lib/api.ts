@@ -1,6 +1,6 @@
 import { db } from './supabase'
 import type { Trip, Student, Project, Destination } from './model'
-export async function joinClass(code: string, nickname: string) {
+export async function joinClass(code: string, nickname: string, pin: string) {
   const client = db()
   const {
     data: { session },
@@ -12,9 +12,18 @@ export async function joinClass(code: string, nickname: string) {
   const { data, error } = await client.rpc('join_class', {
     p_code: code.trim().toUpperCase(),
     p_nickname: nickname.trim(),
+    p_pin: pin,
   })
   if (error) throw error
-  return (Array.isArray(data) ? data[0] : data) as Student
+  if (data.error) {
+    const wait = data.retry_after ? ` (${Math.ceil(data.retry_after / 60)}분 이내)` : ''
+    throw new Error(data.error + wait)
+  }
+  return data.student as Student
+}
+export async function resetStudentPin(studentId: string, pin: string) {
+  const { error } = await db().rpc('reset_student_pin', { p_student: studentId, p_pin: pin })
+  if (error) throw error
 }
 export async function myStudent() {
   const { data: session, error: sessionError } = await db()

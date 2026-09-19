@@ -1734,13 +1734,15 @@ fieldset {
     box-shadow: none;
     margin: 0;
     padding: 0;
-    break-before: page;
+    break-before: auto;
+    break-inside: auto;
   }
   .print-page:first-child {
     break-before: auto;
   }
   .portfolio-cover {
     padding-top: 5mm;
+    break-after: page;
   }
   .cover-meta {
     margin-bottom: 20mm;
@@ -1760,30 +1762,70 @@ fieldset {
   }
   .portfolio-photos {
     break-inside: avoid;
+    gap: 3mm;
+    margin-bottom: 4mm;
   }
   .portfolio-photos img {
-    max-height: 70mm;
+    max-height: 46mm;
   }
   .portfolio-columns {
     display: block;
   }
   .budget-box {
     break-inside: avoid;
-    max-width: 95mm;
-    margin: 8mm 0;
+    max-width: none;
+    margin: 3mm 0;
+    padding: 3mm;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2mm 4mm;
+    font-size: 9pt;
+  }
+  .budget-box h3 {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: 10pt;
+  }
+  .budget-box > div {
+    margin: 0;
+    gap: 2mm;
+    flex-wrap: wrap;
+    overflow-wrap: anywhere;
+  }
+  .budget-box .budget-total {
+    padding-top: 0;
+    border-top: 0;
+  }
+  .portfolio-destination h2 {
+    margin: 3mm 0;
+    font-size: 20pt;
+  }
+  .portfolio-destination h2 small {
+    font-size: 11pt;
   }
   .story-block {
     break-inside: auto;
+    margin: 3mm 0;
   }
   .story-block h3 {
     break-after: avoid;
+    margin: 0 0 1.5mm;
+    font-size: 10pt;
   }
   .story-block p {
-    orphans: 3;
-    widows: 3;
+    margin: 0;
+    font-size: 10pt;
+    line-height: 1.5;
+    orphans: 2;
+    widows: 2;
+  }
+  .diary-block {
+    padding-top: 3mm;
   }
   .chapter {
     padding-top: 3mm;
+    padding-bottom: 2mm;
+    break-after: avoid;
   }
   .passport-page .passport {
     border: 0;
@@ -1798,7 +1840,9 @@ fieldset {
     break-inside: avoid;
   }
   .portfolio-destination footer {
-    margin-bottom: 10mm;
+    margin: 3mm 0;
+    padding-top: 2mm;
+    break-before: avoid;
   }
   .world-map,
   .stamp,
@@ -2184,5 +2228,26 @@ fieldset {
   }
   .passport-page .passport {
     padding-top: 4mm;
+  }
+}
+.privacy-note {
+  margin: 12px 0 20px;
+  padding: 12px 16px;
+  border: 1px solid #d6e4e1;
+  border-radius: 12px;
+  background: #f4f8f6;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.privacy-note summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.privacy-note p {
+  margin: 6px 0;
+}
+@media print {
+  .privacy-note {
+    display: none;
   }
 }
